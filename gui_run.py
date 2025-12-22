@@ -38,7 +38,7 @@ class SimpleGUI:
 
         self.result_text = scrolledtext.ScrolledText(root, width=120, height=60,
                                                       font=('Consolas', 15),
-                                                      bg='#000000', fg='#FFFFFF',
+                                                      bg='#000000', fg="#FFFFFF",
                                                       wrap=tk.WORD, insertbackground='white')
         self.result_text.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
 

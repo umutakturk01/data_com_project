@@ -54,41 +54,76 @@ def corrupt_data(data):
     method = random.choice(methods)
     return method(data)
 
+def handle_client(packet, client2_socket):
+    """Client1'den gelen paketi işler ve Client2'ye iletir"""
+    try:
+        parts = packet.split("|")
+        if len(parts) == 3:
+            data, method, control = parts
+            should_corrupt = random.random() < 0.75
+
+            if should_corrupt:
+                corrupted, corruption_method = corrupt_data(data)
+                new_packet = f"{corrupted}|{method}|{control}|{corruption_method}"
+                print(f"[SERVER] Veri bozuldu: {corruption_method}")
+            else:
+                new_packet = f"{data}|{method}|{control}|BOZULMADI"
+                print(f"[SERVER] Veri bozulmadı")
+
+            client2_socket.settimeout(10.0)
+            try:
+                client2_conn, addr2 = client2_socket.accept()
+                print(f"[SERVER] Client 2 bağlandı: {addr2}")
+                client2_conn.send(new_packet.encode())
+                client2_conn.close()
+                print(f"[SERVER] Client 2'ye paket gönderildi")
+            except socket.timeout:
+                print("[SERVER] HATA: Client 2 bağlanmadı (timeout)")
+            except Exception as e:
+                print(f"[SERVER] HATA: Client 2 bağlantı hatası: {e}")
+        else:
+            print(f"[SERVER] HATA: Geçersiz paket formatı: {packet}")
+    except Exception as e:
+        print(f"[SERVER] HATA: Paket işleme hatası: {e}")
+
 def start_server():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     server.bind(('localhost', 5000))
     server.listen(5)
-    print("Server 5000 portunda başlatıldı...")
+    print("[SERVER] 5000 portunda başlatıldı (Client1 için)")
 
     client2_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     client2_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     client2_socket.bind(('localhost', 5001))
     client2_socket.listen(5)
-    print("Client 2 için 5001 portu dinleniyor...")
+    print("[SERVER] 5001 portu dinleniyor (Client2 için)")
+    print("[SERVER] Hazır! İstekleri bekliyorum...\n")
 
     while True:
-        client1_conn, addr = server.accept()
-        print(f"Client 1 bağlandı: {addr}")
-        packet = client1_conn.recv(4096).decode()
+        try:
+            client1_conn, addr = server.accept()
+            print(f"[SERVER] Client 1 bağlandı: {addr}")
 
-        if packet:
-            parts = packet.split("|")
-            if len(parts) == 3:
-                data, method, control = parts
-                should_corrupt = random.random() < 0.75
+            packet = client1_conn.recv(4096).decode()
+            client1_conn.close()
 
-                if should_corrupt:
-                    corrupted, corruption_method = corrupt_data(data)
-                    new_packet = f"{corrupted}|{method}|{control}|{corruption_method}"
-                else:
-                    new_packet = f"{data}|{method}|{control}|BOZULMADI"
+            if packet:
+                print(f"[SERVER] Paket alındı: {packet[:50]}...")
+                thread = threading.Thread(
+                    target=handle_client,
+                    args=(packet, client2_socket),
+                    daemon=True
+                )
+                thread.start()
+            else:
+                print("[SERVER] UYARI: Boş paket alındı")
 
-                client2_conn, _ = client2_socket.accept()
-                client2_conn.send(new_packet.encode())
-                client2_conn.close()
-
-        client1_conn.close()
+        except KeyboardInterrupt:
+            print("\n[SERVER] Kapatılıyor...")
+            break
+        except Exception as e:
+            print(f"[SERVER] HATA: {e}")
 
 if __name__ == "__main__":
     start_server()
