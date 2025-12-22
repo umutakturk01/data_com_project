@@ -1,8 +1,8 @@
 import tkinter as tk
 from tkinter import messagebox, scrolledtext
-import random
-from client1_sender import get_control_info
-from server_corruptor import corrupt_data
+import threading
+from client1_sender import send_to_server
+from client2_receiver import receive_from_server, get_control_info
 
 class SimpleGUI:
     def __init__(self, root):
@@ -50,54 +50,55 @@ class SimpleGUI:
             return
 
         method = self.method_var.get()
-        control_info = get_control_info(data, method)
-        packet = f"{data}|{method}|{control_info}"
-
         self.result_text.delete('1.0', tk.END)
 
-        output = "=" * 50 + "\n"
-        output += "Oluşturulan Paket    : " + packet + "\n"
-        output += "Veri                 : " + data + "\n"
-        output += "Yöntem               : " + method + "\n"
-        output += "Kontrol Bilgisi      : " + control_info + "\n"
-        output += "=" * 50 + "\n"
-        output += "Paket sunucuya başarıyla gönderildi!\n"
-        output += "=" * 50 + "\n\n"
+        def process():
+            try:
+                output = "=" * 50 + "\n"
+                output += "Client 1 - Paket Gönderiliyor\n"
+                output += "=" * 50 + "\n"
 
-        should_corrupt = random.random() < 0.75
-        output += "=" * 50 + "\n"
-        output += "Sunucu - Alınan Paket\n"
-        output += "=" * 50 + "\n"
-        output += "Orijinal Veri        : " + data + "\n"
-        output += "Yöntem               : " + method + "\n"
-        output += "Kontrol Bilgisi      : " + control_info + "\n"
+                packet, control_info = send_to_server(data, method)
 
-        if should_corrupt:
-            corrupted_data, corruption_method = corrupt_data(data)
-            output += "Bozulmuş Veri        : " + corrupted_data + "\n"
-            output += "Bozma Yöntemi        : " + corruption_method + "\n"
-            output += "Durum                : Hata enjekte edildi\n"
-        else:
-            corrupted_data = data
-            output += "Durum                : Veri bozulmadan iletildi\n"
+                output += "Oluşturulan Paket    : " + packet + "\n"
+                output += "Veri                 : " + data + "\n"
+                output += "Yöntem               : " + method + "\n"
+                output += "Kontrol Bilgisi      : " + control_info + "\n"
+                output += "=" * 50 + "\n"
+                output += "Paket sunucuya başarıyla gönderildi!\n"
+                output += "=" * 50 + "\n\n"
 
-        output += "Paket İstemci 2'ye iletildi\n"
-        output += "=" * 50 + "\n\n"
+                self.result_text.insert(tk.END, output)
 
-        computed_control = get_control_info(corrupted_data, method)
-        status = "VERİ DOĞRU" if control_info == computed_control else "VERİ BOZUK"
+                output = "=" * 50 + "\n"
+                output += "Client 2 - Sunucudan Paket Alınıyor\n"
+                output += "=" * 50 + "\n"
 
-        output += "=" * 50 + "\n"
-        output += "İstemci 2 - Alınan Paket\n"
-        output += "=" * 50 + "\n"
-        output += "Alınan Veri          : " + corrupted_data + "\n"
-        output += "Yöntem               : " + method + "\n"
-        output += "Gönderilen Kontrol   : " + control_info + "\n"
-        output += "Hesaplanan Kontrol   : " + computed_control + "\n"
-        output += "Durum                : " + status + "\n"
-        output += "=" * 50 + "\n"
+                received_packet = receive_from_server()
+                parts = received_packet.split("|")
 
-        self.result_text.insert('1.0', output)
+                if len(parts) == 4:
+                    received_data, received_method, original_control, corruption_info = parts
+
+                    output += "Alınan Veri          : " + received_data + "\n"
+                    output += "Yöntem               : " + received_method + "\n"
+                    output += "Gönderilen Kontrol   : " + original_control + "\n"
+
+                    if corruption_info != "BOZULMADI":
+                        output += "Bozma Yöntemi        : " + corruption_info + "\n"
+
+                    computed_control = get_control_info(received_data, received_method)
+                    output += "Hesaplanan Kontrol   : " + computed_control + "\n"
+
+                    status = "VERİ DOĞRU" if original_control == computed_control else "VERİ BOZUK"
+                    output += "Durum                : " + status + "\n"
+                    output += "=" * 50 + "\n"
+
+                    self.result_text.insert(tk.END, output)
+            except Exception as e:
+                messagebox.showerror("Hata", f"Sunucu bağlantı hatası:\n{str(e)}\n\nÖnce server_corruptor.py'yi çalıştırın!")
+
+        threading.Thread(target=process, daemon=True).start()
 
 if __name__ == "__main__":
     root = tk.Tk()

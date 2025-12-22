@@ -43,8 +43,8 @@ def calculate_hamming(data):
         bits = format(ord(char), '08b')
         for i in range(0, 8, 4):
             d = [int(b) for b in bits[i:i+4].ljust(4, '0')]
-            p1 = d[0] ^ d[1] ^ d[3]
-            p2 = d[0] ^ d[2] ^ d[3]
+            p1 = d[0] ^ d[1] ^ d[2]
+            p2 = d[0] ^ d[1] ^ d[3]
             p3 = d[1] ^ d[2] ^ d[3]
             result.append(f"{p1}{p2}{d[0]}{p3}{d[1]}{d[2]}{d[3]}")
     return ''.join(result)
@@ -57,7 +57,8 @@ def calculate_checksum(data):
         else:
             word = ord(data[i]) << 8
         total += word
-        total = (total & 0xFFFF) + (total >> 16)
+        while total >> 16:
+            total = (total & 0xFFFF) + (total >> 16)
     return format(~total & 0xFFFF, '04X')
 
 def get_control_info(data, method):
@@ -73,3 +74,14 @@ def get_control_info(data, method):
         return calculate_hamming(data)
     elif method == "CHECKSUM":
         return calculate_checksum(data)
+
+def send_to_server(data, method):
+    import socket
+    control_info = get_control_info(data, method)
+    packet = f"{data}|{method}|{control_info}"
+
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.connect(('localhost', 5000))
+    s.send(packet.encode())
+    s.close()
+    return packet, control_info
