@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 def calculate_parity(data, even=True):
     result = []
     for char in data:
@@ -75,28 +73,3 @@ def get_control_info(data, method):
         return calculate_hamming(data)
     elif method == "CHECKSUM":
         return calculate_checksum(data)
-
-def receive_packet(packet):
-    parts = packet.split('|')
-    if len(parts) != 3:
-        print("Invalid packet!")
-        return
-    
-    data, method, sent_control = parts
-    computed_control = get_control_info(data, method)
-    
-    status = "DATA CORRECT" if sent_control == computed_control else "DATA CORRUPTED"
-    
-    print("=" * 50)
-    print("Client 2 - Received Packet")
-    print("=" * 50)
-    print("Received Data        :", data)
-    print("Method               :", method)
-    print("Sent Check Bits      :", sent_control)
-    print("Computed Check Bits  :", computed_control)
-    print("Status               :", status)
-    print("=" * 50)
-
-if __name__ == "__main__":
-    test_packet = "HELLO|CRC16|BB5D"
-    receive_packet(test_packet)
